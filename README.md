@@ -11,7 +11,7 @@ Current progress: **Phase 1-4 Completed**
 - [x] Phase 2 - Hand Detection and Feature Extraction
 - [x] Phase 3 - Dataset Collection
 - [x] Phase 4 - Data Preprocessing
-- [ ] Phase 5 - Machine Learning Model
+- [x] Phase 5 - Machine Learning Model
 - [ ] Phase 6 - Real-Time Sign Prediction
 - [ ] Phase 7 - Final Integration
 
