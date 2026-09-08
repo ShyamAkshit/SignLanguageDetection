@@ -13,7 +13,7 @@ from dataset_utils import save_sample, DATASET_PATH
 # ============================================================
 
 TARGET_SAMPLES = 200
-CAMERA_INDEX = 0
+CAMERA_INDEX = 1
 SAMPLE_INTERVAL = 0.15
 
 # Hand-detection safety settings
