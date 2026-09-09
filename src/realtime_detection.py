@@ -2,6 +2,7 @@ import cv2
 import mediapipe as mp
 import joblib
 import numpy as np
+import pandas as pd
 
 from feature_extraction import extract_landmarks
 from realtime_features import prepare_realtime_features
@@ -13,9 +14,10 @@ from realtime_features import prepare_realtime_features
 
 MODEL_PATH = "models/hand_landmarker.task"
 
-SVM_PATH = "models/sign_language_svm.joblib"
+# V2 FINAL MODEL
+SVM_PATH = "models/sign_language_svm_v2.joblib"
 
-LABEL_ENCODER_PATH = "models/label_encoder.joblib"
+LABEL_ENCODER_PATH = "models/label_encoder_v2.joblib"
 
 
 # =========================================
@@ -23,23 +25,23 @@ LABEL_ENCODER_PATH = "models/label_encoder.joblib"
 # =========================================
 
 print("----------------------------------")
-print("Real-Time Sign Language Detection")
+print("Real-Time Sign Language Detection V2")
 print("----------------------------------")
 
-print("\nLoading SVM model...")
+print("\nLoading V2 SVM model...")
 
 model = joblib.load(SVM_PATH)
 
-print("SVM model loaded successfully.")
+print("V2 SVM model loaded successfully.")
 
 
-print("\nLoading label encoder...")
+print("\nLoading V2 label encoder...")
 
 label_encoder = joblib.load(
     LABEL_ENCODER_PATH
 )
 
-print("Label encoder loaded successfully.")
+print("V2 label encoder loaded successfully.")
 
 
 # =========================================
@@ -47,7 +49,7 @@ print("Label encoder loaded successfully.")
 # =========================================
 
 camera = cv2.VideoCapture(
-    1,
+    0,
     cv2.CAP_DSHOW
 )
 
@@ -145,6 +147,14 @@ HAND_CONNECTIONS = [
 
 frame_timestamp = 0
 
+# =========================================
+# 7. PREDICTION STABILITY SETTINGS
+# =========================================
+
+PREDICTION_HISTORY_SIZE = 7
+
+prediction_history = []
+
 
 # =========================================
 # 7. MAIN CAMERA LOOP
@@ -205,157 +215,197 @@ while True:
 
     if results.hand_landmarks:
 
-        for hand in results.hand_landmarks:
+        # V2 currently uses one hand
+        hand = results.hand_landmarks[0]
 
 
-            # ---------------------------------
-            # Extract 63 normalized features
-            # ---------------------------------
+        # ---------------------------------
+        # Extract 63 normalized features
+        # ---------------------------------
 
-            features = extract_landmarks(hand)
+        features = extract_landmarks(
+            hand
+        )
 
 
-            # ---------------------------------
-            # Convert 63 → 60 features
-            # ---------------------------------
+        # ---------------------------------
+        # Convert 63 → 60 features
+        # ---------------------------------
 
-            processed_features = (
-                prepare_realtime_features(
-                    features
-                )
+        processed_features = (
+            prepare_realtime_features(
+                features
+            )
+        )
+
+
+        # ---------------------------------
+        # Convert to NumPy array
+        # ---------------------------------
+
+        feature_names = [f"f{i}" for i in range(3, 63)]
+
+        input_data = pd.DataFrame(
+            [processed_features],
+            columns=feature_names
+        )
+
+
+        # ---------------------------------
+        # Predict sign
+        #
+        # IMPORTANT:
+        # The V2 saved model already contains
+        # StandardScaler + SVM.
+        # ---------------------------------
+
+        prediction = model.predict(
+        input_data
+        )
+
+        predicted_class_id = prediction[0]
+
+
+        # =================================
+        # PREDICTION STABILITY
+        # =================================
+
+        prediction_history.append(
+            predicted_class_id
+        )
+
+
+        # Keep only the latest predictions
+
+        if len(prediction_history) > PREDICTION_HISTORY_SIZE:
+
+            prediction_history.pop(0)
+
+
+        # ---------------------------------
+        # Find most common prediction
+        # ---------------------------------
+
+        prediction_counts = np.bincount(
+            prediction_history,
+            minlength=len(label_encoder.classes_)
+        )
+
+
+        stable_class_id = np.argmax(
+            prediction_counts
+        )
+
+
+        # ---------------------------------
+        # Convert stable class ID → sign
+        # ---------------------------------
+
+        predicted_label = (
+            label_encoder.inverse_transform(
+                [stable_class_id]
+            )[0]
+        )
+
+
+        # =================================
+        # 9. DRAW LANDMARKS
+        # =================================
+
+        for landmark in hand:
+
+            x = int(
+                landmark.x *
+                frame.shape[1]
+            )
+
+            y = int(
+                landmark.y *
+                frame.shape[0]
             )
 
 
-            # ---------------------------------
-            # Convert to NumPy array
-            # ---------------------------------
-
-            input_data = np.array(
-                processed_features,
-                dtype=float
-            ).reshape(1, -1)
-
-
-            # ---------------------------------
-            # Predict sign
-            # ---------------------------------
-
-            prediction = model.predict(
-                input_data
-            )
-
-
-            # ---------------------------------
-            # Convert class ID → sign
-            # ---------------------------------
-
-            predicted_class_id = prediction[0]
-
-            predicted_label = (
-                label_encoder.inverse_transform(
-                    [predicted_class_id]
-                )[0]
-            )
-
-
-            # =================================
-            # 9. DRAW LANDMARKS
-            # =================================
-
-            for landmark in hand:
-
-                x = int(
-                    landmark.x *
-                    frame.shape[1]
-                )
-
-                y = int(
-                    landmark.y *
-                    frame.shape[0]
-                )
-
-
-                cv2.circle(
-
-                    frame,
-
-                    (x, y),
-
-                    5,
-
-                    (0, 255, 0),
-
-                    -1
-                )
-
-
-            # ---------------------------------
-            # Draw connections
-            # ---------------------------------
-
-            for start, end in HAND_CONNECTIONS:
-
-                start_point = hand[start]
-
-                end_point = hand[end]
-
-
-                start_x = int(
-                    start_point.x *
-                    frame.shape[1]
-                )
-
-                start_y = int(
-                    start_point.y *
-                    frame.shape[0]
-                )
-
-
-                end_x = int(
-                    end_point.x *
-                    frame.shape[1]
-                )
-
-                end_y = int(
-                    end_point.y *
-                    frame.shape[0]
-                )
-
-
-                cv2.line(
-
-                    frame,
-
-                    (start_x, start_y),
-
-                    (end_x, end_y),
-
-                    (0, 255, 0),
-
-                    2
-                )
-
-
-            # =================================
-            # 10. DISPLAY PREDICTION
-            # =================================
-
-            cv2.putText(
+            cv2.circle(
 
                 frame,
 
-                f"Prediction: {predicted_label}",
+                (x, y),
 
-                (30, 50),
-
-                cv2.FONT_HERSHEY_SIMPLEX,
-
-                1.2,
+                5,
 
                 (0, 255, 0),
 
-                3
+                -1
             )
+
+
+        # ---------------------------------
+        # Draw connections
+        # ---------------------------------
+
+        for start, end in HAND_CONNECTIONS:
+
+            start_point = hand[start]
+
+            end_point = hand[end]
+
+
+            start_x = int(
+                start_point.x *
+                frame.shape[1]
+            )
+
+            start_y = int(
+                start_point.y *
+                frame.shape[0]
+            )
+
+
+            end_x = int(
+                end_point.x *
+                frame.shape[1]
+            )
+
+            end_y = int(
+                end_point.y *
+                frame.shape[0]
+            )
+
+
+            cv2.line(
+
+                frame,
+
+                (start_x, start_y),
+
+                (end_x, end_y),
+
+                (0, 255, 0),
+
+                2
+            )
+
+
+        # =================================
+        # 10. DISPLAY PREDICTION
+        # =================================
+
+        cv2.putText(
+
+            frame,
+
+            f"Prediction: {predicted_label}",
+
+            (30, 50),
+
+            cv2.FONT_HERSHEY_SIMPLEX,
+
+            1.2,
+
+            (0, 255, 0),
+
+            3
+        )
 
 
     else:
@@ -364,6 +414,8 @@ while True:
         # NO HAND DETECTED
         # =================================
 
+        prediction_history.clear()
+        
         cv2.putText(
 
             frame,
@@ -388,7 +440,7 @@ while True:
 
     cv2.imshow(
 
-        "Sign Language Detection",
+        "Sign Language Detection V2",
 
         frame
     )
