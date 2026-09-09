@@ -2,7 +2,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 
-from src.dataset_utils import DATASET_PATH
+from dataset_utils import DATASET_PATH
 
 
 def prepare_dataset_v2(test_size=0.20, random_state=42):
