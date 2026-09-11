@@ -25,9 +25,9 @@ LABEL_ENCODER_PATH = "models/label_encoder_v2.joblib"
 
 CAMERA_INDEX = 0
 
-PREDICTION_HISTORY_SIZE = 15
+PREDICTION_HISTORY_SIZE = 10
 
-STABLE_FRAMES_REQUIRED = 10
+STABLE_FRAMES_REQUIRED = 7
 
 
 # =========================================
