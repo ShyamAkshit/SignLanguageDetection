@@ -1,6 +1,6 @@
 import time
+import joblib
 
-from sklearn.metrics import accuracy_score, classification_report
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -8,12 +8,19 @@ from sklearn.svm import SVC
 from preprocess_dataset_v2 import prepare_dataset_v2
 
 
-print("----------------------------------")
-print("V2 SVM Baseline Training")
-print("----------------------------------")
+MODEL_PATH = "models/sign_language_svm_v2.joblib"
+ENCODER_PATH = "models/label_encoder_v2.joblib"
 
 
-# Prepare V2 dataset
+print("=" * 60)
+print("TRAINING V2 SVM")
+print("=" * 60)
+
+
+# --------------------------------------------------
+# 1. PREPARE DATASET
+# --------------------------------------------------
+
 (
     X_train,
     X_test,
@@ -26,25 +33,55 @@ print("----------------------------------")
 ) = prepare_dataset_v2()
 
 
-print("\nDataset prepared.")
-print("Training shape:", X_train.shape)
-print("Testing shape:", X_test.shape)
-print("Number of classes:", len(label_encoder.classes_))
+print("\n" + "-" * 60)
+print("DATASET SUMMARY")
+print("-" * 60)
+
+print(f"Training samples : {X_train.shape[0]}")
+print(f"Testing samples  : {X_test.shape[0]}")
+print(f"Features         : {X_train.shape[1]}")
+print(f"Classes          : {len(label_encoder.classes_)}")
+
+print("\nClasses:")
+print(list(label_encoder.classes_))
 
 
-# Create SVM pipeline
+# --------------------------------------------------
+# 2. CREATE SVM PIPELINE
+# --------------------------------------------------
+
+print("\n" + "-" * 60)
+print("CREATING SVM")
+print("-" * 60)
+
 model = Pipeline([
-    ("scaler", StandardScaler()),
-    ("svm", SVC(
-        kernel="rbf",
-        C=10,
-        gamma="scale"
-    ))
+    (
+        "scaler",
+        StandardScaler()
+    ),
+    (
+        "svm",
+        SVC(
+            kernel="rbf",
+            C=300,
+            gamma="scale"
+        )
+    )
 ])
 
+print("Scaler: StandardScaler")
+print("Kernel: RBF")
+print("C: 300")
+print("Gamma: scale")
 
-# Train model
-print("\nTraining SVM...")
+
+# --------------------------------------------------
+# 3. TRAIN
+# --------------------------------------------------
+
+print("\n" + "-" * 60)
+print("TRAINING MODEL")
+print("-" * 60)
 
 start_time = time.time()
 
@@ -52,60 +89,70 @@ model.fit(X_train, y_train)
 
 training_time = time.time() - start_time
 
-print("Training complete.")
-
-
-# Make predictions
-predictions = model.predict(X_test)
-
-
-# Overall accuracy
-accuracy = accuracy_score(y_test, predictions)
-
-
-print("\n----------------------------------")
-print("V2 SVM Baseline Results")
-print("----------------------------------")
-
+print(f"\nTraining completed.")
 print(f"Training time: {training_time:.4f} seconds")
-print(f"Testing accuracy: {accuracy * 100:.2f}%")
 
 
-# Classification report
-print("\nClassification Report:")
+# --------------------------------------------------
+# 4. TRAINING ACCURACY
+# --------------------------------------------------
 
-print(
-    classification_report(
-        y_test,
-        predictions,
-        target_names=label_encoder.classes_
-    )
-)
+train_accuracy = model.score(X_train, y_train)
+
+print(f"Training accuracy: {train_accuracy * 100:.2f}%")
 
 
-# Left-hand accuracy
-left_mask = hand_test.to_numpy() == "left"
+# --------------------------------------------------
+# 5. TEST ACCURACY
+# --------------------------------------------------
 
-left_accuracy = accuracy_score(
-    y_test[left_mask],
-    predictions[left_mask]
-)
+start_prediction = time.time()
 
+test_accuracy = model.score(X_test, y_test)
 
-# Right-hand accuracy
-right_mask = hand_test.to_numpy() == "right"
+prediction_time = time.time() - start_prediction
 
-right_accuracy = accuracy_score(
-    y_test[right_mask],
-    predictions[right_mask]
-)
+print(f"Test accuracy: {test_accuracy * 100:.2f}%")
+print(f"Prediction time: {prediction_time:.4f} seconds")
 
 
-print("----------------------------------")
-print("Hand-Specific Accuracy")
-print("----------------------------------")
+# --------------------------------------------------
+# 6. SAVE MODEL
+# --------------------------------------------------
 
-print(f"Left-hand accuracy:  {left_accuracy * 100:.2f}%")
-print(f"Right-hand accuracy: {right_accuracy * 100:.2f}%")
+print("\n" + "-" * 60)
+print("SAVING MODEL")
+print("-" * 60)
 
-print("----------------------------------")
+joblib.dump(model, MODEL_PATH)
+joblib.dump(label_encoder, ENCODER_PATH)
+
+print(f"Model saved:")
+print(MODEL_PATH)
+
+print(f"\nLabel encoder saved:")
+print(ENCODER_PATH)
+
+
+# --------------------------------------------------
+# 7. FINAL SUMMARY
+# --------------------------------------------------
+
+print("\n" + "=" * 60)
+print("V2 SVM TRAINING COMPLETE")
+print("=" * 60)
+
+print(f"\nTraining accuracy : {train_accuracy * 100:.2f}%")
+print(f"Test accuracy     : {test_accuracy * 100:.2f}%")
+print(f"Training time     : {training_time:.4f} seconds")
+print(f"Classes           : {len(label_encoder.classes_)}")
+print(f"Features          : {X_train.shape[1]}")
+
+print("\nModel:")
+print("StandardScaler + RBF SVM")
+print("C = 300")
+print("gamma = scale")
+
+print("\nSaved files:")
+print(MODEL_PATH)
+print(ENCODER_PATH)
